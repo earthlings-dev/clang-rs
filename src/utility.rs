@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use clang_sys::*;
 
-use libc::{c_void};
+use libc::c_void;
 
 //================================================
 // Macros
@@ -146,7 +146,10 @@ macro_rules! options {
 // FromError _____________________________________
 
 /// A type that can convert a `T` into a `Result<(), Self>`.
-pub trait FromError<T>: Sized where T: Sized {
+pub trait FromError<T>: Sized
+where
+    T: Sized,
+{
     fn from_error(error: T) -> Result<(), Self>;
 }
 
@@ -159,11 +162,7 @@ pub trait Nullable: Sized {
 
 impl Nullable for *mut c_void {
     fn map<U, F: FnOnce(*mut c_void) -> U>(self, f: F) -> Option<U> {
-        if !self.is_null() {
-            Some(f(self))
-        } else {
-            None
-        }
+        if !self.is_null() { Some(f(self)) } else { None }
     }
 }
 
@@ -236,11 +235,7 @@ impl Nullable for CXType {
 
 impl Nullable for CXVersion {
     fn map<U, F: FnOnce(CXVersion) -> U>(self, f: F) -> Option<U> {
-        if self.Major >= 0 {
-            Some(f(self))
-        } else {
-            None
-        }
+        if self.Major >= 0 { Some(f(self)) } else { None }
     }
 }
 
@@ -253,7 +248,12 @@ pub fn addressof<T>(value: &mut T) -> *mut c_void {
 }
 
 pub fn from_path<P: AsRef<Path>>(path: P) -> CString {
-    from_string(path.as_ref().as_os_str().to_str().expect("invalid C string"))
+    from_string(
+        path.as_ref()
+            .as_os_str()
+            .to_str()
+            .expect("invalid C string"),
+    )
 }
 
 pub fn to_path(clang: CXString) -> PathBuf {
@@ -266,23 +266,19 @@ pub fn from_string<S: AsRef<str>>(string: S) -> CString {
 }
 
 pub unsafe fn to_string(clang: CXString) -> String {
-        let c = CStr::from_ptr(clang_getCString(clang));
-        let rust = c.to_str().expect("invalid Rust string").into();
-        clang_disposeString(clang);
-        rust
+    let c = CStr::from_ptr(clang_getCString(clang));
+    let rust = c.to_str().expect("invalid Rust string").into();
+    clang_disposeString(clang);
+    rust
 }
 
 pub fn to_string_option(clang: CXString) -> Option<String> {
-    clang.map(to_string).and_then(|s| {
-        if !s.is_empty() {
-            Some(s)
-        } else {
-            None
-        }
-    })
+    clang
+        .map(to_string)
+        .and_then(|s| if !s.is_empty() { Some(s) } else { None })
 }
 
-#[cfg(feature="clang_3_8")]
+#[cfg(feature = "clang_3_8")]
 pub fn to_string_set_option(clang: *mut CXStringSet) -> Option<Vec<String>> {
     unsafe {
         if clang.is_null() || (*clang).Count == 0 {
@@ -290,9 +286,15 @@ pub fn to_string_set_option(clang: *mut CXStringSet) -> Option<Vec<String>> {
         }
 
         let c = ::std::slice::from_raw_parts((*clang).Strings, (*clang).Count as usize);
-        let rust = c.iter().map(|c| {
-            CStr::from_ptr(clang_getCString(*c)).to_str().expect("invalid Rust string").into()
-        }).collect();
+        let rust = c
+            .iter()
+            .map(|c| {
+                CStr::from_ptr(clang_getCString(*c))
+                    .to_str()
+                    .expect("invalid Rust string")
+                    .into()
+            })
+            .collect();
         clang_disposeStringSet(clang);
         Some(rust)
     }
@@ -300,5 +302,8 @@ pub fn to_string_set_option(clang: *mut CXStringSet) -> Option<Vec<String>> {
 
 pub fn with_string<S: AsRef<str>, T, F: FnOnce(CXString) -> T>(string: S, f: F) -> T {
     let string = from_string(string);
-    f(CXString { data: string.as_ptr() as *const c_void, private_flags: 0 })
+    f(CXString {
+        data: string.as_ptr() as *const c_void,
+        private_flags: 0,
+    })
 }
